@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EduPlan Pro</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="ambient ambient-one"></div>
+  <div class="ambient ambient-two"></div>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand-block">
+        <div class="brand-mark">EP</div>
+        <div>
+          <p class="eyebrow">Modern lesson planning</p>
+          <h1>EduPlan Pro</h1>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <button id="themeToggle" class="ghost-button" type="button" aria-label="Toggle color theme">
+          <span id="themeToggleLabel">Dark mode</span>
+        </button>
+        <button id="logoutButton" class="ghost-button hidden" type="button">Logout</button>
+      </div>
+    </header>
+
+    <main class="content-shell">
+      <section id="setupView" class="view panel hidden">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Cloud setup</p>
+            <h2>Connect Supabase</h2>
+          </div>
+          <span class="status-pill">Required</span>
+        </div>
+
+        <div class="setup-grid">
+          <div class="setup-copy">
+            <p class="lead">
+              EduPlan Pro stores lessons in the cloud with Supabase authentication and database tables, so plans stay synced for teachers and students across sessions.
+            </p>
+            <div class="info-stack">
+              <article class="mini-panel">
+                <h3>1. Create the tables</h3>
+                <p>Run the schema in <code>supabase/schema.sql</code> inside your Supabase SQL editor.</p>
+              </article>
+              <article class="mini-panel">
+                <h3>2. Paste your project keys</h3>
+                <p>Use your project URL and anon key. Lesson data goes to the database, not browser storage.</p>
+              </article>
+              <article class="mini-panel">
+                <h3>3. Optional AI upgrade</h3>
+                <p>Set <code>OPENAI_API_KEY</code> before launching Electron for live AI generation. Without it, the app falls back to a structured smart template.</p>
+              </article>
+            </div>
+          </div>
+
+          <form id="configForm" class="setup-form">
+            <label class="field">
+              <span>Supabase project URL</span>
+              <input id="supabaseUrlInput" type="url" placeholder="https://your-project.supabase.co" required>
+            </label>
+            <label class="field">
+              <span>Supabase anon key</span>
+              <textarea id="supabaseAnonKeyInput" rows="5" placeholder="Paste your anon public key" required></textarea>
+            </label>
+            <label class="checkbox-field">
+              <input id="rememberConfigInput" type="checkbox" checked>
+              <span>Remember this setup on this device</span>
+            </label>
+            <div class="button-row">
+              <button class="primary-button" type="submit">Save and continue</button>
+              <button id="clearConfigButton" class="ghost-button" type="button">Clear saved config</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section id="authView" class="view auth-view hidden">
+        <div class="auth-hero">
+          <p class="eyebrow">Built for classrooms that move fast</p>
+          <h2>Plan lessons, map the week, and generate ideas without the clutter.</h2>
+          <p class="lead">
+            Students can keep projects organized. Teachers can build richer lessons with AI-assisted outlines, calendar visibility, and one-click PDF exports.
+          </p>
+          <div class="hero-stat-strip">
+            <article>
+              <strong>Weekly view</strong>
+              <span>See lessons in a calm planner layout.</span>
+            </article>
+            <article>
+              <strong>Cloud sync</strong>
+              <span>Secure auth and database-backed lesson storage.</span>
+            </article>
+            <article>
+              <strong>Fast exports</strong>
+              <span>Turn any lesson into a polished PDF in seconds.</span>
+            </article>
+          </div>
+        </div>
+
+        <div class="panel auth-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Welcome</p>
+              <h2 id="authTitle">Login to your planner</h2>
+            </div>
+            <span id="authModePill" class="status-pill">Login</span>
+          </div>
+          <form id="authForm" class="auth-form">
+            <label class="field">
+              <span>Email</span>
+              <input id="authEmail" type="email" placeholder="teacher@school.edu" required>
+            </label>
+            <label class="field">
+              <span>Password</span>
+              <input id="authPassword" type="password" placeholder="At least 6 characters" minlength="6" required>
+            </label>
+            <button id="authSubmitButton" class="primary-button" type="submit">Login</button>
+          </form>
+          <p id="authSwitchText" class="muted-copy">New here? Create your account to start building lessons.</p>
+          <button id="authSwitchButton" class="text-button" type="button">Switch to signup</button>
+        </div>
+      </section>
+
+      <section id="dashboardView" class="view dashboard-view hidden">
+        <div class="dashboard-intro panel">
+          <div>
+            <p class="eyebrow">Dashboard</p>
+            <h2 id="welcomeHeading">Your upcoming lessons</h2>
+            <p id="welcomeSubtext" class="lead subtle"></p>
+          </div>
+          <div class="button-row">
+            <button id="openAiButton" class="ghost-button" type="button">AI lesson generator</button>
+            <button id="openLessonButton" class="primary-button" type="button">New lesson</button>
+          </div>
+        </div>
+
+        <section class="metric-grid">
+          <article class="metric-card panel">
+            <span class="metric-label">Next lesson</span>
+            <strong id="metricNextLesson" class="metric-value">No lessons</strong>
+            <p id="metricNextLessonMeta" class="metric-meta">Create your first plan to get started.</p>
+          </article>
+          <article class="metric-card panel">
+            <span class="metric-label">This week</span>
+            <strong id="metricWeekCount" class="metric-value">0</strong>
+            <p class="metric-meta">Lessons scheduled in the current week.</p>
+          </article>
+          <article class="metric-card panel">
+            <span class="metric-label">Total plans</span>
+            <strong id="metricTotalCount" class="metric-value">0</strong>
+            <p class="metric-meta">Saved securely in your database.</p>
+          </article>
+          <article class="metric-card panel">
+            <span class="metric-label">AI-assisted</span>
+            <strong id="metricAiCount" class="metric-value">0</strong>
+            <p class="metric-meta">Lessons created with generator support.</p>
+          </article>
+        </section>
+
+        <section class="planner-layout">
+          <div class="panel planner-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Weekly calendar</p>
+                <h3 id="calendarRangeLabel">This week</h3>
+              </div>
+              <div class="button-row compact-row">
+                <button id="prevWeekButton" class="ghost-button" type="button">Previous</button>
+                <button id="todayWeekButton" class="ghost-button" type="button">Today</button>
+                <button id="nextWeekButton" class="ghost-button" type="button">Next</button>
+              </div>
+            </div>
+
+            <div class="filter-toolbar">
+              <label class="field inline-field search-field">
+                <span>Search</span>
+                <input id="searchInput" type="search" placeholder="Search by title, objectives, or assessment">
+              </label>
+              <label class="field inline-field">
+                <span>Timeframe</span>
+                <select id="scopeFilter">
+                  <option value="all">All lessons</option>
+                  <option value="week" selected>This week</option>
+                  <option value="upcoming">Upcoming</option>
+                  <option value="past">Past</option>
+                </select>
+              </label>
+              <label class="field inline-field">
+                <span>Status</span>
+                <select id="statusFilter">
+                  <option value="all">All statuses</option>
+                  <option value="planned">Planned</option>
+                  <option value="draft">Draft</option>
+                  <option value="completed">Completed</option>
+                </select>
+              </label>
+            </div>
+
+            <div id="calendarGrid" class="calendar-grid"></div>
+          </div>
+
+          <div class="panel sidebar-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Upcoming</p>
+                <h3>Next on the schedule</h3>
+              </div>
+              <span id="upcomingCountPill" class="status-pill">0 lessons</span>
+            </div>
+            <div id="upcomingList" class="stack-list"></div>
+          </div>
+        </section>
+
+        <section class="detail-layout">
+          <div class="panel lesson-library-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Lesson library</p>
+                <h3>Search, edit, export, and refine</h3>
+              </div>
+            </div>
+            <div id="lessonList" class="lesson-list"></div>
+          </div>
+
+          <div class="panel assistant-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">AI studio</p>
+                <h3>Generate stronger first drafts</h3>
+              </div>
+            </div>
+            <p class="lead subtle">
+              Enter a topic and EduPlan Pro will draft objectives, activities, and an assessment flow you can send straight into the planner.
+            </p>
+            <div class="assistant-actions">
+              <button id="openAiButtonSecondary" class="primary-button" type="button">Open generator</button>
+            </div>
+            <div id="assistantPreview" class="assistant-preview">
+              <div class="empty-state compact-empty">
+                <strong>No AI draft yet</strong>
+                <p>Generate a lesson idea to preview it here before saving.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <div id="lessonModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="lessonModalTitle">
+    <div class="modal-card">
+      <div class="panel-heading modal-heading">
+        <div>
+          <p class="eyebrow">Lesson details</p>
+          <h2 id="lessonModalTitle">Create lesson</h2>
+        </div>
+        <button class="icon-button" type="button" data-close-modal="lessonModal" aria-label="Close lesson editor">×</button>
+      </div>
+
+      <form id="lessonForm" class="modal-form">
+        <input id="lessonIdInput" type="hidden">
+        <input id="lessonAiInput" type="hidden" value="false">
+        <label class="field">
+          <span>Title</span>
+          <input id="lessonTitleInput" type="text" placeholder="Photosynthesis deep dive" required>
+        </label>
+        <label class="field">
+          <span>Date and time</span>
+          <input id="lessonDateTimeInput" type="datetime-local" required>
+        </label>
+        <label class="field">
+          <span>Status</span>
+          <select id="lessonStatusInput">
+            <option value="planned">Planned</option>
+            <option value="draft">Draft</option>
+            <option value="completed">Completed</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Objectives</span>
+          <textarea id="lessonObjectivesInput" rows="4" placeholder="What should learners understand or be able to do?" required></textarea>
+        </label>
+        <label class="field">
+          <span>Activities</span>
+          <textarea id="lessonActivitiesInput" rows="5" placeholder="Describe the sequence of learning activities." required></textarea>
+        </label>
+        <label class="field">
+          <span>Assessment</span>
+          <textarea id="lessonAssessmentInput" rows="4" placeholder="How will learning be checked?" required></textarea>
+        </label>
+        <div class="button-row">
+          <button class="primary-button" type="submit">Save lesson</button>
+          <button class="ghost-button" type="button" data-close-modal="lessonModal">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="aiModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="aiModalTitle">
+    <div class="modal-card">
+      <div class="panel-heading modal-heading">
+        <div>
+          <p class="eyebrow">AI lesson generator</p>
+          <h2 id="aiModalTitle">Generate a lesson draft</h2>
+        </div>
+        <button class="icon-button" type="button" data-close-modal="aiModal" aria-label="Close AI generator">×</button>
+      </div>
+
+      <form id="aiForm" class="modal-form">
+        <label class="field">
+          <span>Topic</span>
+          <input id="aiTopicInput" type="text" placeholder="World War II causes" required>
+        </label>
+        <label class="field">
+          <span>Audience</span>
+          <input id="aiAudienceInput" type="text" placeholder="Grade 8 history students">
+        </label>
+        <label class="field">
+          <span>Teaching style or note</span>
+          <textarea id="aiContextInput" rows="3" placeholder="Project-based, discussion-heavy, 45-minute class"></textarea>
+        </label>
+        <div class="button-row">
+          <button id="aiGenerateButton" class="primary-button" type="submit">Generate draft</button>
+          <button class="ghost-button" type="button" data-close-modal="aiModal">Close</button>
+        </div>
+      </form>
+
+      <div id="aiResult" class="ai-result">
+        <div class="empty-state compact-empty">
+          <strong>No draft generated yet</strong>
+          <p>Describe a topic to create objectives, activities, and assessment suggestions.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+
+  <script src="config.js"></script>
+  <script src="renderer.js"></script>
+</body>
+</html>
