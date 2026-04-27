@@ -1,13 +1,19 @@
 {
   "name": "lesson-planner",
   "version": "1.0.0",
-  "description": "",
+  "description": "An Electron lesson planner with Supabase auth, cloud-backed lesson storage, AI drafting, and PDF export.",
   "main": "main.js",
   "scripts": {
     "start": "electron ."
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "electron",
+    "lesson-planner",
+    "supabase",
+    "education",
+    "productivity"
+  ],
+  "author": "Kimi Euri Estacio",
   "license": "ISC",
   "devDependencies": {
     "electron": "^29.0.0"
