@@ -32,6 +32,10 @@ It combines Supabase-backed authentication and cloud storage with a modern dashb
 - Export lesson plans to PDF
 - Persist auth, theme, and local setup preferences for smoother repeat use
 
+## Screenshot
+
+![EduPlan Pro dashboard](./assets/eduplan-pro-dashboard.png)
+
 ## Setup
 
 1. Create a Supabase project.
@@ -49,6 +53,8 @@ npm start
 ```
 
 If `OPENAI_API_KEY` is not set, the app still works and falls back to a structured lesson template generator instead of live AI output.
+
+If Supabase is temporarily unreachable on your machine, the app also includes a local demo mode so the interface can still be opened and explored offline.
 
 ## Project structure
 

@@ -1,10 +1,17 @@
-const STORAGE_KEYS = { config: "eduplan.config", session: "eduplan.session", theme: "eduplan.theme" };
+const STORAGE_KEYS = {
+  config: "eduplan.config",
+  session: "eduplan.session",
+  theme: "eduplan.theme",
+  demoMode: "eduplan.demoMode",
+  demoLessons: "eduplan.demoLessons"
+};
 const state = {
   authMode: "login",
   config: loadConfig(),
   session: loadSession(),
   user: null,
   lessons: [],
+  demoMode: loadDemoMode(),
   filters: { query: "", scope: "week", status: "all" },
   currentWeekStart: startOfWeek(new Date()),
   aiDraft: null,
@@ -19,14 +26,14 @@ document.addEventListener("DOMContentLoaded", () => {
   bindEvents();
   applyTheme(loadTheme());
   hydrateConfigForm();
-  initializeApp();
+  initializeApp().then(applyPreviewStateFromUrl);
 });
 
 function cacheElements() {
   const ids = [
     "setupView", "authView", "dashboardView", "logoutButton", "themeToggle", "themeToggleLabel", "toast",
     "configForm", "supabaseUrlInput", "supabaseAnonKeyInput", "rememberConfigInput", "clearConfigButton",
-    "authTitle", "authModePill", "authForm", "authSubmitButton", "authSwitchText", "authSwitchButton", "authEmail", "authPassword",
+    "authTitle", "authModePill", "authForm", "authSubmitButton", "authSwitchText", "authSwitchButton", "demoModeButton", "authEmail", "authPassword",
     "welcomeHeading", "welcomeSubtext", "metricNextLesson", "metricNextLessonMeta", "metricWeekCount", "metricTotalCount", "metricAiCount",
     "calendarRangeLabel", "calendarGrid", "upcomingList", "upcomingCountPill", "lessonList", "assistantPreview", "searchInput", "scopeFilter", "statusFilter",
     "lessonModal", "lessonForm", "lessonModalTitle", "lessonIdInput", "lessonAiInput", "lessonTitleInput", "lessonDateTimeInput", "lessonStatusInput",
@@ -42,6 +49,7 @@ function bindEvents() {
   refs.clearConfigButton.addEventListener("click", clearSavedConfig);
   refs.authForm.addEventListener("submit", handleAuthSubmit);
   refs.authSwitchButton.addEventListener("click", toggleAuthMode);
+  refs.demoModeButton.addEventListener("click", enableDemoMode);
   refs.logoutButton.addEventListener("click", handleLogout);
   document.getElementById("openLessonButton").addEventListener("click", () => openLessonModal());
   document.getElementById("openAiButton").addEventListener("click", () => openModal("ai"));
@@ -121,6 +129,11 @@ async function initializeApp() {
     return;
   }
 
+  if (state.demoMode) {
+    activateDemoSession();
+    return;
+  }
+
   showView("auth");
   if (!state.session) {
     return;
@@ -197,12 +210,53 @@ function updateAuthCopy() {
   refs.authSwitchButton.textContent = isLogin ? "Switch to signup" : "Switch to login";
 }
 
+function enableDemoMode() {
+  state.demoMode = true;
+  persistDemoMode();
+  clearSession();
+  activateDemoSession();
+  showToast("Demo mode enabled. Lessons will be stored on this device only.");
+}
+
+function activateDemoSession() {
+  state.user = { id: "demo-user", email: "kimieuri@gmail.com (demo)" };
+  refs.logoutButton.classList.remove("hidden");
+  refs.authForm.reset();
+  showView("dashboard");
+  state.lessons = loadDemoLessons();
+  renderDashboard();
+}
+
+function applyPreviewStateFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const requestedTheme = params.get("theme");
+  const shouldUseDemo = params.get("demo") === "1";
+  const requestedModal = params.get("modal");
+
+  if (requestedTheme === "dark" || requestedTheme === "light") {
+    applyTheme(requestedTheme);
+  }
+
+  if (shouldUseDemo) {
+    state.demoMode = true;
+    persistDemoMode();
+    clearSession();
+    activateDemoSession();
+  }
+
+  if (requestedModal === "ai" && (!refs.aiModal || refs.aiModal.classList.contains("hidden"))) {
+    openModal("ai");
+  }
+}
+
 async function handleAuthSubmit(event) {
   event.preventDefault();
   const buttonLabel = state.authMode === "login" ? "Login" : "Create account";
   setLoading(refs.authSubmitButton, true, state.authMode === "login" ? "Logging in..." : "Creating account...");
 
   try {
+    state.demoMode = false;
+    persistDemoMode();
     const email = refs.authEmail.value.trim();
     const password = refs.authPassword.value;
     const authPayload = state.authMode === "login" ? await signIn(email, password) : await signUp(email, password);
@@ -225,13 +279,33 @@ async function handleAuthSubmit(event) {
     await refreshLessons();
     showToast(state.authMode === "login" ? "Welcome back." : "Account created successfully.");
   } catch (error) {
-    showToast(error.message || "Authentication failed.");
+    const fallbackMessage = isNetworkAuthError(error)
+      ? `${error.message || "Authentication failed."} Use demo mode below if you want to keep working offline.`
+      : (error.message || "Authentication failed.");
+    showToast(fallbackMessage);
   } finally {
     setLoading(refs.authSubmitButton, false, state.authMode === "login" ? "Login" : buttonLabel);
   }
 }
 
 async function handleLogout() {
+  if (state.demoMode) {
+    state.demoMode = false;
+    persistDemoMode();
+    state.user = null;
+    state.lessons = [];
+    state.aiDraft = null;
+    refs.logoutButton.classList.add("hidden");
+    refs.assistantPreview.innerHTML = renderEmptyAssistant();
+    refs.aiResult.innerHTML = renderEmptyAiResult();
+    refs.upcomingList.innerHTML = "";
+    refs.lessonList.innerHTML = "";
+    refs.calendarGrid.innerHTML = "";
+    showView("auth");
+    showToast("Demo mode closed.");
+    return;
+  }
+
   try {
     if (state.session?.access_token) {
       await fetch(`${state.config.supabaseUrl}/auth/v1/logout`, {
@@ -260,7 +334,7 @@ async function handleLogout() {
 async function refreshLessons() {
   refs.dashboardView.classList.add("is-loading");
   try {
-    state.lessons = await fetchLessons();
+    state.lessons = state.demoMode ? loadDemoLessons() : await fetchLessons();
     renderDashboard();
   } catch (error) {
     showToast(error.message || "Unable to load lessons.");
@@ -702,6 +776,9 @@ function clearSession() {
 }
 
 async function fetchLessons() {
+  if (state.demoMode) {
+    return loadDemoLessons();
+  }
   return supabaseRequest("/rest/v1/lessons?select=*&order=scheduled_at.asc", {
     method: "GET",
     headers: { Prefer: "return=representation" }
@@ -709,6 +786,18 @@ async function fetchLessons() {
 }
 
 async function createLesson(payload) {
+  if (state.demoMode) {
+    const demoLesson = {
+      ...payload,
+      id: createDemoId(),
+      user_id: state.user.id,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    const nextLessons = [...loadDemoLessons(), demoLesson];
+    persistDemoLessons(nextLessons);
+    return [demoLesson];
+  }
   const body = { ...payload, user_id: state.user.id };
   return supabaseRequest("/rest/v1/lessons", {
     method: "POST",
@@ -718,6 +807,13 @@ async function createLesson(payload) {
 }
 
 async function updateLesson(id, payload) {
+  if (state.demoMode) {
+    const nextLessons = loadDemoLessons().map((lesson) =>
+      lesson.id === id ? { ...lesson, ...payload, updated_at: new Date().toISOString() } : lesson
+    );
+    persistDemoLessons(nextLessons);
+    return nextLessons.find((lesson) => lesson.id === id);
+  }
   return supabaseRequest(`/rest/v1/lessons?id=eq.${encodeURIComponent(id)}`, {
     method: "PATCH",
     headers: { Prefer: "return=representation" },
@@ -726,6 +822,11 @@ async function updateLesson(id, payload) {
 }
 
 async function deleteLesson(id) {
+  if (state.demoMode) {
+    const nextLessons = loadDemoLessons().filter((lesson) => lesson.id !== id);
+    persistDemoLessons(nextLessons);
+    return null;
+  }
   return supabaseRequest(`/rest/v1/lessons?id=eq.${encodeURIComponent(id)}`, { method: "DELETE" }, true);
 }
 
@@ -740,6 +841,75 @@ function loadConfig() {
 
 function loadSession() {
   return safeJsonParse(sessionStorage.getItem(STORAGE_KEYS.session));
+}
+
+function loadDemoMode() {
+  return localStorage.getItem(STORAGE_KEYS.demoMode) === "true";
+}
+
+function persistDemoMode() {
+  localStorage.setItem(STORAGE_KEYS.demoMode, state.demoMode ? "true" : "false");
+}
+
+function loadDemoLessons() {
+  const savedLessons = safeJsonParse(localStorage.getItem(STORAGE_KEYS.demoLessons));
+  if (Array.isArray(savedLessons)) {
+    return savedLessons;
+  }
+
+  const seededLessons = buildDemoLessons();
+  persistDemoLessons(seededLessons);
+  return seededLessons;
+}
+
+function persistDemoLessons(lessons) {
+  state.lessons = lessons;
+  localStorage.setItem(STORAGE_KEYS.demoLessons, JSON.stringify(lessons));
+}
+
+function buildDemoLessons() {
+  const now = new Date();
+  return [
+    {
+      id: createDemoId(),
+      user_id: "demo-user",
+      title: "Photosynthesis fundamentals",
+      objectives: "Explain how plants convert light into chemical energy.\nIdentify the role of chlorophyll and carbon dioxide.",
+      activities: "Warm-up question on plant growth.\nShort diagram walkthrough.\nPartner activity labeling the photosynthesis process.\nExit recap discussion.",
+      assessment: "Collect a one-paragraph explanation of photosynthesis and a labeled diagram.",
+      scheduled_at: addDays(now, 1).toISOString(),
+      status: "planned",
+      ai_generated: false,
+      created_at: now.toISOString(),
+      updated_at: now.toISOString()
+    },
+    {
+      id: createDemoId(),
+      user_id: "demo-user",
+      title: "World War II causes overview",
+      objectives: "Summarize the major political and economic causes of World War II.\nCompare long-term and short-term triggers.",
+      activities: "Timeline starter.\nTeacher mini-lesson.\nSmall-group cause sorting task.\nClass reflection.",
+      assessment: "Students submit a short comparison between two major causes.",
+      scheduled_at: addDays(now, 3).toISOString(),
+      status: "draft",
+      ai_generated: true,
+      created_at: now.toISOString(),
+      updated_at: now.toISOString()
+    }
+  ];
+}
+
+function createDemoId() {
+  return `demo-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function isNetworkAuthError(error) {
+  const message = String(error?.message || "").toLowerCase();
+  return message.includes("failed to fetch")
+    || message.includes("network")
+    || message.includes("fetch")
+    || message.includes("resolve")
+    || message.includes("dns");
 }
 
 function loadTheme() {

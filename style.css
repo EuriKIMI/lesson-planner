@@ -421,6 +421,14 @@ p {
   gap: 16px;
 }
 
+.demo-entry {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+
 .dashboard-intro {
   display: flex;
   justify-content: space-between;
